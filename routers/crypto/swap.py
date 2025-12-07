@@ -2,9 +2,43 @@
 import logging
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 swap_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# ===== Response Models =====
+class SwapResponse(BaseModel):
+    status: str
+    from_token: str
+    to_token: str
+    swapped_amount: float
+    price_from_usd: float
+    price_to_usd: float
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "status": "success",
+                "from_token": "SOL",
+                "to_token": "USDC",
+                "swapped_amount": 29.523456,
+                "price_from_usd": 23.45,
+                "price_to_usd": 0.78,
+            }
+        }
+
+
+class ErrorResponse(BaseModel):
+    status: str
+    detail: str
+
+    class Config:
+        schema_extra = {
+            "example": {"status": "error", "detail": "Failed to fetch price for SOL"}
+        }
+
 
 # Mapping token ke CoinGecko ID
 COINGECKO_IDS = {
@@ -46,6 +80,46 @@ async def get_token_price_usd(token: str) -> float:
         "Simulate swapping one token to another based on real-time CoinGecko prices. "
         "This is a simulation only and does not execute an actual transaction."
     ),
+    response_model=SwapResponse,
+    responses={
+        200: {
+            "description": "Swap simulation successful",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "from_token": "SOL",
+                        "to_token": "USDC",
+                        "swapped_amount": 29.523456,
+                        "price_from_usd": 23.45,
+                        "price_to_usd": 0.78,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid token or request",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "detail": "Token XYZ is not supported",
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Failed to fetch price or simulation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "detail": "Failed to fetch price for SOL",
+                    }
+                }
+            },
+        },
+    },
 )
 async def swap_tokens(
     from_token: str = Query(
@@ -56,14 +130,6 @@ async def swap_tokens(
     ),
     amount: float = Query(..., description="Amount of the from_token to swap"),
 ):
-    """
-    Simulate swapping tokens from one type to another using real-time prices from CoinGecko.
-
-    - **from_token**: Token symbol to swap from
-    - **to_token**: Token symbol to swap to
-    - **amount**: Amount of from_token to swap
-    - **Note**: This is a simulation; no actual blockchain transaction is executed.
-    """
     try:
         price_from = await get_token_price_usd(from_token)
         price_to = await get_token_price_usd(to_token)
@@ -84,6 +150,8 @@ async def swap_tokens(
             "price_to_usd": price_to,
         }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"❌ Swap simulation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

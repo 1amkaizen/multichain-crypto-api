@@ -2,9 +2,51 @@
 import logging
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 token_info_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# ===== Response Models =====
+class TokenMetadata(BaseModel):
+    name: str | None
+    symbol: str | None
+    decimals: int | None
+    contract_address: str | None
+    coingecko_id: str | None
+
+
+class TokenInfoResponse(BaseModel):
+    status: str
+    token: str
+    metadata: TokenMetadata
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "status": "success",
+                "token": "sol",
+                "metadata": {
+                    "name": "Solana",
+                    "symbol": "SOL",
+                    "decimals": 9,
+                    "contract_address": None,
+                    "coingecko_id": "solana",
+                },
+            }
+        }
+
+
+class ErrorResponse(BaseModel):
+    status: str
+    detail: str
+
+    class Config:
+        schema_extra = {
+            "example": {"status": "error", "detail": "Token not found on CoinGecko"}
+        }
+
 
 # 🔹 Mapping popular token aliases to CoinGecko ID
 TOKEN_ALIAS = {
@@ -29,14 +71,10 @@ TOKEN_ALIAS = {
     "dai": "dai",
     "ftm": "fantom",
     "cake": "pancakeswap-token",
-    # 🔹 can add more as needed
 }
 
 
 async def fetch_token_metadata_coingecko(token_id: str) -> dict:
-    """
-    Fetch token metadata from CoinGecko API
-    """
     url = f"https://api.coingecko.com/api/v3/coins/{token_id.lower()}"
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url)
@@ -74,16 +112,53 @@ async def fetch_token_metadata_coingecko(token_id: str) -> dict:
         "Fetch real-time metadata of a token from CoinGecko. "
         "Popular aliases are supported, e.g., sol -> solana, eth -> ethereum, etc."
     ),
+    response_model=TokenInfoResponse,
+    responses={
+        200: {
+            "description": "Token metadata fetched successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "token": "sol",
+                        "metadata": {
+                            "name": "Solana",
+                            "symbol": "SOL",
+                            "decimals": 9,
+                            "contract_address": None,
+                            "coingecko_id": "solana",
+                        },
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Token not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "detail": "Token not found on CoinGecko",
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Failed to fetch token metadata",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "detail": "Failed to fetch token info",
+                    }
+                }
+            },
+        },
+    },
 )
 async def get_token_info(
     token: str = Query(..., description="Token symbol or alias to fetch metadata for")
 ):
-    """
-    Fetch real-time token metadata from CoinGecko.
-
-    - **token**: Token symbol or popular alias (e.g., sol, eth, usdt)
-    - **Note**: Alias mapping is applied automatically if available
-    """
     try:
         token_id = TOKEN_ALIAS.get(token.lower(), token.lower())
         metadata = await fetch_token_metadata_coingecko(token_id)

@@ -84,23 +84,19 @@ async def send_token(
 
 
 # -------------------------------------------------------------------
-# ✔ FIX BAGIAN INI — fungsi diperbaiki agar menerima "chain"
+# ✔ UPDATE estimate_gas_fee — TIDAK perlu destination_wallet lagi
 # -------------------------------------------------------------------
 
 
-async def estimate_gas_fee(
-    token: str, chain: str, destination_wallet: str, amount: float
-):
+async def estimate_gas_fee(token: str, chain: str, amount: float):
     """
     Estimate biaya gas untuk kirim native token.
+    Tidak perlu wallet, cukup token, chain, dan amount.
     Implementasi dasar, bisa diganti sesuai chain masing-masing.
     """
-    logger.info(
-        f"🔧 Estimasi gas | token={token}, chain={chain}, wallet={destination_wallet}, amount={amount}"
-    )
+    logger.info(f"🔧 Estimasi gas | token={token}, chain={chain}, amount={amount}")
 
     token_lower = token.lower()
-
     if token_lower not in TOKEN_HELPERS.keys():
         raise ValueError(f"Token {token} belum didukung untuk estimate gas")
 
@@ -110,5 +106,4 @@ async def estimate_gas_fee(
     logger.info(
         f"💡 Estimasi gas fee untuk {token.upper()} di chain {chain}: {gas_fee}"
     )
-
     return gas_fee
