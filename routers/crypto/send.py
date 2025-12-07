@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 @send_router.post(
     "/send/native",
-    summary="Kirim Native Token",  # 🔹 teks yang muncul di Swagger UI
-    description="Endpoint untuk mengirim native token seperti SOL, ETH, BNB, atau BASE ke wallet tujuan",
+    summary="Send Native Token",  # 🔹 teks yang muncul di Swagger UI / Redoc
+    description="Endpoint to send native tokens like SOL, ETH, BNB, or BASE to a destination wallet",
 )
+
 async def send_native_token(
     token: str,
     destination_wallet: str,
@@ -64,9 +65,10 @@ async def send_native_token(
 # -------------------- USDC --------------------
 @send_router.post(
     "/send/usdc",
-    summary="Kirim USDC",
-    description="Endpoint untuk mengirim USDC ke wallet tujuan melalui chain ETH/BSC/TRX",
+    summary="Send USDC",
+    description="Endpoint to send USDC to a destination wallet via ETH/BSC/TRX chains",
 )
+
 async def send_usdc_endpoint(
     chain: str,  # misal: eth, bsc, trx
     destination_wallet: str,
@@ -109,9 +111,10 @@ async def send_usdc_endpoint(
 # -------------------- USDT --------------------
 @send_router.post(
     "/send/usdt",
-    summary="Kirim USDT",
-    description="Endpoint untuk mengirim USDT ke wallet tujuan melalui chain ETH/BSC/TRX",
+    summary="Send USDT",
+    description="Endpoint to send USDT to a destination wallet via ETH/BSC/TRX chains",
 )
+
 async def send_usdt_endpoint(
     chain: str,  # misal: eth, bsc, trx
     destination_wallet: str,
