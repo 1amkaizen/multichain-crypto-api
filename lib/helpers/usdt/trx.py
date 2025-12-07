@@ -6,44 +6,54 @@ from tronpy import Tron
 from tronpy.keys import PrivateKey
 from tronpy.providers import HTTPProvider
 from tronpy.exceptions import TransactionNotFound
-from config import TRON_FULL_NODE, TRON_PRIVATE_KEY, TRC20_USDT_ADDRESS
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
-# ABI hasil compile kontrak MyToken.sol
+# ABI TRC20 standar
 TRC20_ABI = [
-    {"constant": True, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}],
-     "payable": False, "stateMutability": "view", "type": "function"},
-    {"constant": False, "inputs": [{"name": "recipient", "type": "address"}, {"name": "amount", "type": "uint256"}],
-     "name": "transfer", "outputs": [{"name": "", "type": "bool"}],
-     "payable": False, "stateMutability": "nonpayable", "type": "function"},
-    {"constant": True, "inputs": [{"name": "account", "type": "address"}],
-     "name": "balanceOf", "outputs": [{"name": "", "type": "uint256"}],
-     "payable": False, "stateMutability": "view", "type": "function"},
-    {"constant": True, "inputs": [], "name": "name", "outputs": [{"name": "", "type": "string"}],
-     "payable": False, "stateMutability": "view", "type": "function"},
-    {"constant": True, "inputs": [], "name": "symbol", "outputs": [{"name": "", "type": "string"}],
-     "payable": False, "stateMutability": "view", "type": "function"},
-    {"constant": True, "inputs": [], "name": "totalSupply", "outputs": [{"name": "", "type": "uint256"}],
-     "payable": False, "stateMutability": "view", "type": "function"},
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"name": "", "type": "uint8"}],
+        "payable": False,
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "constant": False,
+        "inputs": [
+            {"name": "recipient", "type": "address"},
+            {"name": "amount", "type": "uint256"},
+        ],
+        "name": "transfer",
+        "outputs": [{"name": "", "type": "bool"}],
+        "payable": False,
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "constant": True,
+        "inputs": [{"name": "account", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "payable": False,
+        "stateMutability": "view",
+        "type": "function",
+    },
 ]
 
-# Setup client TRX
-client = Tron(HTTPProvider(TRON_FULL_NODE)) if TRON_FULL_NODE else None
-account = PrivateKey(bytes.fromhex(TRON_PRIVATE_KEY)) if TRON_PRIVATE_KEY else None
-TRON_ADDRESS = account.public_key.to_base58check_address() if account else None
 
-
-def get_usdt_balance(wallet_address: str) -> float:
+def get_usdt_balance(wallet_address: str, rpc_url: str, token_address: str) -> float:
     """
     Cek saldo USDT (TRC20) dari wallet_address
     """
     try:
-        if not client:
-            raise Exception("Tron node tidak tersedia")
-
-        contract = client.get_contract(TRC20_USDT_ADDRESS)
+        client = Tron(HTTPProvider(rpc_url))
+        contract = client.get_contract(token_address)
 
         try:
             decimals = contract.functions.decimals()
@@ -52,7 +62,7 @@ def get_usdt_balance(wallet_address: str) -> float:
             decimals = 6
 
         balance_raw = contract.functions.balanceOf(wallet_address)
-        balance = balance_raw / (10 ** decimals)
+        balance = balance_raw / (10**decimals)
 
         logger.info(f"💰 Saldo USDT {wallet_address}: {balance} USDT")
         return balance
@@ -62,12 +72,22 @@ def get_usdt_balance(wallet_address: str) -> float:
         return 0.0
 
 
-async def send_usdt_trx(destination_wallet: str, amount: float):
+async def send_usdt_trx(
+    destination_wallet: str,
+    amount: float,
+    rpc_url: str,
+    private_key: str,
+    token_address: str,
+):
+    """
+    Kirim USDT TRC20 ke wallet tujuan
+    """
     try:
-        if not client or not account:
-            raise Exception("Tron node atau private key tidak tersedia")
+        client = Tron(HTTPProvider(rpc_url))
+        account = PrivateKey(bytes.fromhex(private_key))
+        sender_address = account.public_key.to_base58check_address()
 
-        contract = client.get_contract(TRC20_USDT_ADDRESS)
+        contract = client.get_contract(token_address)
 
         try:
             decimals = contract.functions.decimals()
@@ -75,11 +95,24 @@ async def send_usdt_trx(destination_wallet: str, amount: float):
             logger.warning("⚠️ Gagal baca decimals, pakai default 6 (USDT)")
             decimals = 6
 
-        value = int(amount * (10 ** decimals))
+        value = int(amount * (10**decimals))
 
+        # Cek saldo admin
+        admin_balance = get_usdt_balance(sender_address, rpc_url, token_address)
+        if admin_balance < amount:
+            raise Exception(f"Saldo USDT admin tidak cukup: {admin_balance} < {amount}")
+
+        # Cek TRX untuk energy
+        admin_trx_balance = client.get_account(sender_address)["balance"] / 1_000_000
+        if admin_trx_balance < 0.1:
+            raise Exception(
+                f"Saldo TRX admin terlalu rendah untuk bayar fee: {admin_trx_balance} TRX"
+            )
+
+        # Build & sign transaksi
         txn = (
             contract.functions.transfer(destination_wallet, value)
-            .with_owner(TRON_ADDRESS)
+            .with_owner(sender_address)
             .build()
             .sign(account)
         )
@@ -88,14 +121,16 @@ async def send_usdt_trx(destination_wallet: str, amount: float):
         tx_hash = tx_result["txid"]
         logger.info(f"🕓 Menunggu konfirmasi transaksi TRX {tx_hash}...")
 
-        # === retry loop: cek sampai trx ketemu atau timeout 30 detik ===
+        # Retry cek transaksi
         receipt = None
-        for i in range(10):  # maksimal 10x cek
+        for i in range(10):
             try:
                 receipt = client.get_transaction_info(tx_hash)
-                break  # kalau ketemu, stop loop
+                break
             except TransactionNotFound:
-                logger.info(f"⏳ Transaksi {tx_hash} belum masuk block, retry {i+1}/10...")
+                logger.info(
+                    f"⏳ Transaksi {tx_hash} belum masuk block, retry {i+1}/10..."
+                )
                 time.sleep(3)
 
         if not receipt:
@@ -103,15 +138,20 @@ async def send_usdt_trx(destination_wallet: str, amount: float):
             return None
 
         if receipt.get("receipt", {}).get("result") == "SUCCESS":
-            logger.info(f"✅ Token berhasil dikirim ke {destination_wallet}, tx_hash={tx_hash}")
-            # log saldo setelah kirim
-            get_usdt_balance(TRON_ADDRESS)
-            get_usdt_balance(destination_wallet)
+            logger.info(
+                f"✅ USDT berhasil dikirim ke {destination_wallet}, tx_hash={tx_hash}"
+            )
+            # log saldo sebelum & sesudah
+            get_usdt_balance(sender_address, rpc_url, token_address)
+            get_usdt_balance(destination_wallet, rpc_url, token_address)
             return tx_hash
         else:
-            logger.error(f"❌ Transaksi gagal: {tx_hash}, receipt={receipt}")
+            err_msg = receipt.get("receipt", {}).get("resultMessage", "Unknown error")
+            logger.error(
+                f"❌ Transaksi gagal: {tx_hash}, reason={err_msg}, full_receipt={receipt}"
+            )
             return None
 
     except Exception as e:
-        logger.error(f"❌ Gagal kirim token: {e}", exc_info=True)
+        logger.error(f"❌ Gagal kirim USDT TRX: {e}", exc_info=True)
         return None

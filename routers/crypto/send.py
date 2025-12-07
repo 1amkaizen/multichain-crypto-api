@@ -2,6 +2,8 @@
 import logging
 from fastapi import APIRouter, HTTPException
 from lib.native_sender import send_token
+from lib.stable_sender import send_usdc_token, send_usdt_token
+
 
 send_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,6 +23,9 @@ async def send_native_token(
 ):
     """Kirim native token ke wallet tujuan"""
     try:
+        if amount <= 0:
+            raise ValueError("Amount harus lebih dari 0")
+
         logger.info(
             f"🚀 Permintaan kirim {token.upper()} ke {destination_wallet} sejumlah {amount}"
         )
@@ -53,4 +58,95 @@ async def send_native_token(
 
     except Exception as e:
         logger.error(f"❌ Gagal kirim token: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# -------------------- USDC --------------------
+@send_router.post(
+    "/send/usdc",
+    summary="Kirim USDC",
+    description="Endpoint untuk mengirim USDC ke wallet tujuan melalui chain ETH/BSC/TRX",
+)
+async def send_usdc_endpoint(
+    chain: str,  # misal: eth, bsc, trx
+    destination_wallet: str,
+    amount: float,
+    token_address: str,  # ✅ USDC contract address
+    rpc_url: str = None,
+    private_key: str = None,
+):
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount harus lebih dari 0")
+
+    if not token_address:
+        raise HTTPException(status_code=400, detail="USDC token address wajib diisi")
+
+    try:
+        logger.info(
+            f"🚀 Permintaan kirim {amount} USDC ke {destination_wallet} via {chain.upper()}, contract={token_address}"
+        )
+        tx_hash = await send_usdc_token(
+            destination_wallet=destination_wallet,
+            amount=amount,
+            chain=chain,
+            rpc_url=rpc_url,
+            private_key=private_key,
+            token_address=token_address,  # ✅ kirim contract dari endpoint
+        )
+        if not tx_hash:
+            raise HTTPException(status_code=400, detail="Transaksi gagal dijalankan")
+        return {
+            "status": "success",
+            "tx_hash": str(tx_hash),
+            "message": "USDC berhasil dikirim",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Gagal kirim USDC: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# -------------------- USDT --------------------
+@send_router.post(
+    "/send/usdt",
+    summary="Kirim USDT",
+    description="Endpoint untuk mengirim USDT ke wallet tujuan melalui chain ETH/BSC/TRX",
+)
+async def send_usdt_endpoint(
+    chain: str,  # misal: eth, bsc, trx
+    destination_wallet: str,
+    amount: float,
+    token_address: str,  # ✅ USDT contract address
+    rpc_url: str = None,
+    private_key: str = None,
+):
+    """Kirim USDT ke wallet tujuan"""
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount harus lebih dari 0")
+
+    if not token_address:
+        raise HTTPException(status_code=400, detail="USDT token address wajib diisi")
+
+    try:
+        logger.info(
+            f"🚀 Permintaan kirim {amount} USDT ke {destination_wallet} via {chain.upper()}, contract={token_address}"
+        )
+        tx_hash = await send_usdt_token(
+            destination_wallet=destination_wallet,
+            amount=amount,
+            chain=chain,
+            rpc_url=rpc_url,
+            private_key=private_key,
+            token_address=token_address,
+        )
+        if not tx_hash:
+            raise HTTPException(status_code=400, detail="Transaksi gagal dijalankan")
+        return {
+            "status": "success",
+            "tx_hash": str(tx_hash),
+            "message": "USDT berhasil dikirim",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Gagal kirim USDT: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
