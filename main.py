@@ -17,8 +17,8 @@ from routers.crypto.tx_status import tx_status_router
 # ====================== APP ======================
 app = FastAPI(
     title="Crypto API Service",
-    description="API untuk kirim token crypto (ETH, USDT, BNB, SOL, dll)",
-    version="1.0.0",
+    description="API for sending, simulating swaps, and checking crypto tokens (ETH, USDT, BNB, SOL, etc.).",
+    version="1.1.1",
 )
 
 # ====================== CORS (RapidAPI Test Support) ======================
