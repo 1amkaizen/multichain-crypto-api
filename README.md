@@ -1,4 +1,4 @@
-# Multi-Chain Crypto Utility Suite API
+# MultiChain Crypto API
 
 API service untuk manajemen dan pengiriman token crypto (ETH, USDT, USDC, BNB, SOL, dan lainnya) dengan FastAPI.
 

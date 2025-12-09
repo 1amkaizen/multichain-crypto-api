@@ -32,7 +32,7 @@ from routers.crypto.tx_status import tx_status_router
 
 # ====================== APP ======================
 app = FastAPI(
-    title="Multi-Chain Crypto Utility Suite API",
+    title="MultiChain Crypto API",
     description="API for sending, simulating swaps, and checking crypto tokens (ETH, USDT, BNB, SOL, etc.).",
     version="1.1.1",
 )
