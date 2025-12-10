@@ -42,21 +42,21 @@ async def send_token(
     try:
         # semua helper dianggap async
         if inspect.iscoroutinefunction(send_func):
-            # TRX pakai param berbeda
             if token_lower == "trx":
                 tx_hash = await send_func(
                     destination_wallet=destination_wallet,
-                    amount_trx=amount,
+                    amount=amount,  # sesuaikan parameter TRX juga jadi 'amount'
                     rpc_url=rpc_url,
                     private_key=private_key,
                 )
             else:
                 tx_hash = await send_func(
                     destination_wallet=destination_wallet,
-                    amount_eth=amount if token_lower == "eth" else amount,
+                    amount=amount,  # cukup pakai 'amount'
                     rpc_url=rpc_url,
                     private_key=private_key,
                 )
+
         else:
             tx_hash = send_func(
                 destination_wallet=destination_wallet,

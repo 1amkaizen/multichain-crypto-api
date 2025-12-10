@@ -28,7 +28,7 @@ def create_admin_keypair(private_key: str):
 
 
 def send_sol(
-    destination_wallet: str, amount_sol: float, rpc_url: str, private_key: str
+    destination_wallet: str, amount: float, rpc_url: str, private_key: str
 ):
     """Kirim SOL ke wallet tujuan, RPC & private key dikirim dari endpoint"""
     try:
@@ -46,9 +46,9 @@ def send_sol(
             )
             return None
 
-        lamports = int(amount_sol * 1_000_000_000)
+        lamports = int(amount * 1_000_000_000)
         logger.info(
-            f"🚀 Kirim {amount_sol} SOL ({lamports} lamports) ke {destination_wallet}"
+            f"🚀 Kirim {amount} SOL ({lamports} lamports) ke {destination_wallet}"
         )
 
         blockhash_resp = client.get_latest_blockhash()

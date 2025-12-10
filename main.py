@@ -55,6 +55,7 @@ async def enforce_rapidapi_proxy(request: Request, call_next):
         "/openapi.json",
         "/api/v1/crypto/ping",
         "/api/v1/crypto/tokens",
+        "/api/v1/crypto/token_info",
     ]
 
     # kalau path ada di whitelist → langsung lolos
